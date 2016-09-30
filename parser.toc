@@ -1,0 +1,131 @@
+
+(add-ns sm (git-dependency "github.com:jduey/state-maybe.git" "state-maybe.toc"))
+(add-ns fr (git-dependency "github.com:jduey/free.git" "free.toc"))
+
+(deftype get-filename [])
+
+(def file-name
+  (fr/free (get-filename)))
+
+(deftype get-linenumber [])
+
+(def line-number
+  (fr/free (get-linenumber)))
+
+(deftype inc-linenumber [])
+
+(def inc-line
+  (fr/free (inc-linenumber)))
+
+(deftype parser-not-char [test-c])
+
+(defn not-char [test-c]
+  (fr/free (parser-not-char test-c)))
+
+(deftype parser-char-range [lower higher])
+
+(defn char-range [lower higher]
+  (fr/free (parser-char-range lower higher)))
+
+(deftype parser-term-fn [f]
+  Stringable
+  (string-list [_]
+    (comp (list "<terminal-fn ")
+          (string-list f)
+          (list ">"))))
+
+(defn term-fn [f]
+  (fr/free (parser-term-fn f)))
+
+(deftype parser-terminal [term-str]
+  Stringable
+  (string-list [_] (list "<terminal " term-str ">")))
+
+;; too much of a perf hit to write in terms of 'term-fn'
+(defn term [term-str]
+  (fr/free (parser-terminal term-str)))
+
+(deftype repeat-rule [rule])
+
+(defn one-or-more [rule]
+  (fr/free (repeat-rule rule)))
+
+(deftype ignore-rule [rule])
+
+(defn ignore [rule]
+  (fr/free (ignore-rule ((string? rule) (term rule) rule))))
+
+(deftype parser-always [v])
+
+(defn always [v]
+  (fr/free (parser-always v)))
+
+(defn all [& rules]
+  (apply* (fr/free list) (map rules
+                              (fn [rule]
+                                ((string? rule) (term rule) rule)))))
+
+(defn apply [f & rules]
+  (apply* (fr/free f) (map rules
+                           (fn [rule]
+                             ((string? rule) (term rule) rule)))))
+
+(defn any [rule & rules]
+  (comp* ((string? rule) (term rule) rule)
+         (map rules
+              (fn [rule]
+                ((string? rule) (term rule) rule)))))
+
+(deftype optional-rule [rule])
+
+(defn optional [rule]
+  (fr/free (optional-rule rule)))
+
+(deftype none-or-more-rule [rule])
+
+(defn none-or-more [rule]
+  (fr/free (none-or-more-rule rule)))
+
+(deftype parser-rule [name grammar])
+
+(defn rule [name grammar]
+  (fr/free (parser-rule name grammar)))
+
+(deftype recursive-parser-rule [name grammar])
+
+(defn recursive-rule [name grammar]
+  (fr/free (recursive-parser-rule name grammar)))
+
+(deftype recursion-rule [rule-name])
+
+(defn recurse [rule-name]
+  (fr/free (recursion-rule rule-name)))
+
+(def lower-alpha
+  (rule "lower-alpha"
+        (char-range "a" "z")))
+
+(def upper-alpha
+  (rule "upper-alpha"
+        (char-range "A" "Z")))
+
+(def alpha (rule "alpha"
+                 (comp lower-alpha
+                       upper-alpha)))
+
+(def digit
+  (rule "digit"
+        (char-range "0" "9")))
+
+(def alphanum (rule "alphanum"
+                    (comp alpha digit)))
+
+(def hex (rule "hex"
+                 (comp digit
+                       (char-range "a" "f")
+                       (char-range "A" "F"))))
+
+(defn one-of [coll]
+  (let [[x & xs] (seq coll)]
+    (comp* (term x)
+           (map xs term))))
