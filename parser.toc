@@ -53,7 +53,7 @@
 (deftype ignore-rule [rule])
 
 (defn ignore [rule]
-  (fr/free (ignore-rule ((string? rule) (term rule) rule))))
+  (fr/free (ignore-rule ((instance? String rule) (term rule) rule))))
 
 (deftype parser-always [v])
 
@@ -63,18 +63,18 @@
 (defn all [& rules]
   (apply* (fr/free list) (map rules
                               (fn [rule]
-                                ((string? rule) (term rule) rule)))))
+                                ((instance? String rule) (term rule) rule)))))
 
 (defn apply [f & rules]
   (apply* (fr/free f) (map rules
                            (fn [rule]
-                             ((string? rule) (term rule) rule)))))
+                             ((instance? String rule) (term rule) rule)))))
 
 (defn any [rule & rules]
-  (comp* ((string? rule) (term rule) rule)
+  (comp* ((instance? String rule) (term rule) rule)
          (map rules
               (fn [rule]
-                ((string? rule) (term rule) rule)))))
+                ((instance? String rule) (term rule) rule)))))
 
 (deftype optional-rule [rule])
 
