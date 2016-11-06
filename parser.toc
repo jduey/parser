@@ -45,6 +45,13 @@
 (defn term [term-str]
   (fr/free (parser-terminal term-str)))
 
+(defprotocol StringTerminal
+  (string-terminal [rule] rule))
+
+(extend-type String
+  StringTerminal
+  (string-terminal [s] (term s)))
+
 (deftype repeat-rule [rule])
 
 (defn one-or-more [rule]
@@ -53,7 +60,7 @@
 (deftype ignore-rule [rule])
 
 (defn ignore [rule]
-  (fr/free (ignore-rule ((instance? String rule) (term rule) rule))))
+  (fr/free (ignore-rule (string-terminal rule))))
 
 (deftype parser-always [v])
 
@@ -61,20 +68,14 @@
   (fr/free (parser-always v)))
 
 (defn all [& rules]
-  (apply* (fr/free list) (map rules
-                              (fn [rule]
-                                ((instance? String rule) (term rule) rule)))))
+  (apply* (fr/free list) (map rules string-terminal)))
 
 (defn apply [f & rules]
-  (apply* (fr/free f) (map rules
-                           (fn [rule]
-                             ((instance? String rule) (term rule) rule)))))
+  (apply* (fr/free f) (map rules string-terminal)))
 
 (defn any [rule & rules]
-  (comp* ((instance? String rule) (term rule) rule)
-         (map rules
-              (fn [rule]
-                ((instance? String rule) (term rule) rule)))))
+  (comp* (string-terminal rule)
+         (map rules string-terminal)))
 
 (deftype optional-rule [rule])
 
