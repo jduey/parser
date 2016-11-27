@@ -27,19 +27,14 @@
 (defn char-range [lower higher]
   (fr/free (parser-char-range lower higher)))
 
-(deftype parser-term-fn [f]
-  Stringable
-  (string-list [_]
-    (comp (list "<terminal-fn ")
-          (string-list f)
-          (list ">"))))
+(deftype parser-term-fn [f])
 
 (defn term-fn [f]
   (fr/free (parser-term-fn f)))
 
 (deftype parser-terminal [term-str]
   Stringable
-  (string-list [_] (list "<terminal " term-str ">")))
+  (string-list [_] (list "<Term " (str term-str) ">")))
 
 ;; too much of a perf hit to write in terms of 'term-fn'
 (defn term [term-str]
@@ -52,81 +47,106 @@
   StringTerminal
   (string-terminal [s] (term s)))
 
-(deftype repeat-rule [rule])
+(deftype repeat-rule [rule]
+  Stringable
+  (string-list [_] (comp (list "<Repeat ")
+                         (string-list rule)
+                         (list ">")))
+
+  Container
+  (map [_ f]
+    (repeat-rule (f rule))))
 
 (defn one-or-more [rule]
-  (fr/free (repeat-rule rule)))
+  (fr/free-monad (repeat-rule (string-terminal rule))))
 
-(deftype ignore-rule [rule])
+(deftype ignore-rule [rule]
+  Container
+  (map [_ f]
+    (ignore-rule (f rule))))
 
 (defn ignore [rule]
-  (fr/free (ignore-rule (string-terminal rule))))
+  (fr/free-monad (ignore-rule (string-terminal rule))))
 
 (deftype parser-always [v])
 
 (defn always [v]
   (fr/free (parser-always v)))
 
+(deftype Cat [rules]
+  Stringable
+  (string-list [_] (comp (list "<ParserConcat ")
+                         (flat-map (interpose rules ", ") string-list)
+                         (list ">")))
+
+  Container
+  (map [_ f]
+    (Cat (map rules f))))
+
 (defn all [& rules]
-  (apply* (fr/free list) (map rules string-terminal)))
+  (fr/free-monad (Cat (map rules string-terminal))))
 
-(defn apply [f & rules]
-  (apply* (fr/free f) (map rules string-terminal)))
+(deftype Union [rules]
+  Stringable
+  (string-list [_] (comp (list "<ParserUnion ")
+                         (flat-map (interpose rules ", ") string-list)
+                         (list ">")))
 
-(defn any [rule & rules]
-  (comp* (string-terminal rule)
-         (map rules string-terminal)))
+  Container
+  (map [_ f]
+    (Union (map rules f))))
 
-(deftype optional-rule [rule])
+(defn any [& rules]
+  (fr/free-monad (Union (map rules string-terminal))))
 
-(defn optional [rule]
-  (fr/free (optional-rule rule)))
-
-(deftype none-or-more-rule [rule])
+(deftype none-or-more-rule [rule]
+  Container
+  (map [_ f]
+    (none-or-more-rule (f rule))))
 
 (defn none-or-more [rule]
-  (fr/free (none-or-more-rule rule)))
+  (fr/free-monad (none-or-more-rule (string-terminal rule))))
 
-(deftype parser-rule [name grammar])
+(deftype parser-rule [name grammar]
+  Stringable
+  (string-list [_] (comp (list "<ParserRule " (str name) " ")
+                         (string-list grammar)
+                         (list ">")))
+
+  Container
+  (map [_ f]
+    (parser-rule name (f grammar))))
 
 (defn rule [name grammar]
-  (fr/free (parser-rule name grammar)))
+  (fr/free-monad (parser-rule name (string-terminal grammar))))
 
-(deftype recursive-parser-rule [name grammar])
+(deftype recursive-parser-rule [name grammar]
+  Container
+  (map [_ f]
+    (recursive-parser-rule name (f grammar))))
 
 (defn recursive-rule [name grammar]
-  (fr/free (recursive-parser-rule name grammar)))
+  (fr/free-monad (recursive-parser-rule name (string-terminal grammar))))
 
 (deftype recursion-rule [rule-name])
 
 (defn recurse [rule-name]
   (fr/free (recursion-rule rule-name)))
 
-(def lower-alpha
-  (rule "lower-alpha"
-        (char-range "a" "z")))
-
-(def upper-alpha
-  (rule "upper-alpha"
-        (char-range "A" "Z")))
-
-(def alpha (rule "alpha"
-                 (comp lower-alpha
-                       upper-alpha)))
-
-(def digit
-  (rule "digit"
-        (char-range "0" "9")))
-
-(def alphanum (rule "alphanum"
-                    (comp alpha digit)))
-
-(def hex (rule "hex"
-                 (comp digit
-                       (char-range "a" "f")
-                       (char-range "A" "F"))))
+(def lower-alpha (rule "lower-alpha" (char-range "a" "z")))
+(def upper-alpha (rule "upper-alpha" (char-range "A" "Z")))
+(def alpha (rule "alpha" (any lower-alpha upper-alpha)))
+(def digit (rule "digit" (char-range "0" "9")))
+(def alphanum (rule "alphanum" (any alpha digit)))
+(def hex (rule "hex" (any digit
+                          (char-range "a" "f")
+                          (char-range "A" "F"))))
 
 (defn one-of [coll]
-  (let [[x & xs] (seq coll)]
-    (comp* (term x)
-           (map xs term))))
+  (apply any (seq coll)))
+
+(defn apply-to [f & rules]
+  (apply* (fr/free f) (map rules string-terminal)))
+
+(defn optional [rule]
+  (any rule (term "")))
