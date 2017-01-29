@@ -5,32 +5,32 @@
 (deftype get-filename [])
 
 (def file-name
-  (fr/free (get-filename)))
+  (fr/pure (get-filename)))
 
 (deftype get-linenumber [])
 
 (def line-number
-  (fr/free (get-linenumber)))
+  (fr/pure (get-linenumber)))
 
 (deftype inc-linenumber [])
 
 (def inc-line
-  (fr/free (inc-linenumber)))
+  (fr/pure (inc-linenumber)))
 
 (deftype parser-not-char [test-c])
 
 (defn not-char [test-c]
-  (fr/free (parser-not-char test-c)))
+  (fr/pure (parser-not-char test-c)))
 
 (deftype parser-char-range [lower higher])
 
 (defn char-range [lower higher]
-  (fr/free (parser-char-range lower higher)))
+  (fr/pure (parser-char-range lower higher)))
 
 (deftype parser-term-fn [f])
 
 (defn term-fn [f]
-  (fr/free (parser-term-fn f)))
+  (fr/pure (parser-term-fn f)))
 
 (deftype parser-terminal [term-str]
   Stringable
@@ -38,7 +38,7 @@
 
 ;; too much of a perf hit to write in terms of 'term-fn'
 (defn term [term-str]
-  (fr/free (parser-terminal term-str)))
+  (fr/pure (parser-terminal term-str)))
 
 (defprotocol StringTerminal
   (string-terminal [rule] rule))
@@ -71,7 +71,7 @@
 (deftype parser-always [v])
 
 (defn always [v]
-  (fr/free (parser-always v)))
+  (fr/pure (parser-always v)))
 
 (deftype Cat [rules]
   Stringable
@@ -131,7 +131,7 @@
 (deftype recursion-rule [rule-name])
 
 (defn recurse [rule-name]
-  (fr/free (recursion-rule rule-name)))
+  (fr/pure (recursion-rule rule-name)))
 
 (def lower-alpha (rule "lower-alpha" (char-range "a" "z")))
 (def upper-alpha (rule "upper-alpha" (char-range "A" "Z")))
@@ -146,7 +146,7 @@
   (apply any (seq coll)))
 
 (defn apply-to [f & rules]
-  (apply* (fr/free f) (map rules string-terminal)))
+  (apply* (fr/pure f) (map rules string-terminal)))
 
 (defn optional [rule]
   (any rule (term "")))
